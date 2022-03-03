@@ -14,3 +14,5 @@ A script for aseprite that adds some additional functions to custom brushes
 To use brushes from selection, you need to make multiple selections with the rectangular marquee tool. The selections should have at least a 1px margin from each other so that they register as separate brushes. Then, press "Brushes from selection" and now every time you click the brush will change. 
 
 You can also check "Randomize brush order" to randomize which brush gets selected.
+
+NOTE: Unfortunately multiple brushes won't work with the spray can tool :(
