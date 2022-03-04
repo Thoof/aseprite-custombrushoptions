@@ -1,6 +1,6 @@
 # aseprite-custombrushoptions
 
-https://github.com/Thoof/aseprite-custombrushoptions
+![ezgif com-gif-maker](https://user-images.githubusercontent.com/5313706/156688638-fd383d08-691e-4b4d-ab53-457228a5bc00.gif)
 
 A script for aseprite that adds some additional functions to custom brushes
 
