@@ -631,6 +631,8 @@ dlg:button{ id="brush_start",
 				end
 	
 				detect_new_brush_and_update()
+				
+				base_images = {}
 			
 				--[[ Loop through the entire selection and find the start and end points of each subselection
 				When we hit a pixel that is in the selection and is not within the bounds of any already saved subselections, then 
@@ -714,6 +716,8 @@ dlg:button{ id="brush_start",
 					base_images[image_count] = image
 					image_count = image_count + 1
 				end
+				
+				recolored_base_images = {}
 
 				if image_count > 0 then 
 					resize_brush()
