@@ -43,6 +43,15 @@ if app.activeBrush.type == BrushType.IMAGE then
 
 end
 
+local function reset_brush_and_stop_events()
+
+	reset_brush()
+	app.events:off(on_fgcolorchange)
+	app.events:off(on_bgcolorchange)
+	sprite.events:off(on_sprite_change)
+	
+end
+
 -- Initialize the dialog --
 local dlg = Dialog { title = "Custom Brush Options", onclose = reset_brush_and_stop_events }
 
@@ -274,7 +283,7 @@ end
 
 
 -- Resets the brush to the base brush, setting the scale & color back to the original -- 
-local function reset_brush()
+function reset_brush()
 
 	-- If the brush isn't an image brush we want nothing to do with it
 	if app.activeBrush.type ~= BrushType.IMAGE then
@@ -304,14 +313,7 @@ end
 
 
 
-local function reset_brush_and_stop_events()
 
-	resize_brush()
-	app.events:off(on_fgcolorchange)
-	app.events:off(on_bgcolorchange)
-	sprite.events:off(on_sprite_change)
-	
-end
 
 -- Resizes the current brush based on the current slider values --
 local function resize_brush()
@@ -501,7 +503,7 @@ dlg:button {
 
 -- When the fgcolor/bgcolor change, we want to store a version of the brush image at the original image scale
 
-local function on_fgcolorchange()
+function on_fgcolorchange()
 	-- If the brush isn't an image brush we want nothing to do with it
 	if app.activeBrush.type ~= BrushType.IMAGE then
 		return
@@ -517,7 +519,7 @@ local function on_fgcolorchange()
 		
 end
 
-local function on_bgcolorchange()
+function on_bgcolorchange()
 	-- If the brush isn't an image brush we want nothing to do with it
 	if app.activeBrush.type ~= BrushType.IMAGE then
 		return
@@ -541,7 +543,7 @@ app.events:on('fgcolorchange', on_fgcolorchange)
 	
 app.events:on('bgcolorchange', on_bgcolorchange)
 
-local function on_sprite_change()
+function on_sprite_change()
 	if app.activeBrush.type ~= BrushType.IMAGE then
 		return
 	end
