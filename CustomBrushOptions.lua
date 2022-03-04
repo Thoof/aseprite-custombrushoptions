@@ -52,6 +52,19 @@ local function reset_brush_and_stop_events()
 	
 end
 
+
+app.events:on('sitechange',
+  function()
+	if sprite ~= nil then
+		sprite.events:off(on_sprite_change)
+	end 
+	sprite = app.activeSprite
+	if sprite ~= nil then
+		sprite.events:on('change', on_sprite_change)
+	end
+	
+  end)
+
 -- Initialize the dialog --
 local dlg = Dialog { title = "Custom Brush Options", onclose = reset_brush_and_stop_events }
 
@@ -581,15 +594,20 @@ end
 
 local function get_image_from_rect(rect)
 	local image = Image(rect.width, rect.height)
-	
-	local current_image = Image(app.activeSprite)
+
+	local current_image = app.activeImage
+	local image_bounds = current_image.cel.bounds
 	
 	for y = rect.y, rect.y + rect.height do
 		for x = rect.x, rect.x + rect.width do
-
-			local pixelValue = current_image:getPixel(x, y)
-			local c = get_pxc_as_color(pixelValue)
-			image:drawPixel(x - rect.x, y - rect.y, pixelValue)
+		
+			local point_rel_imagebound = Point(x - image_bounds.x, y - image_bounds.y)
+			
+			if point_rel_imagebound.x >= 0 and point_rel_imagebound.y >= 0 and point_rel_imagebound.x < image_bounds.width and point_rel_imagebound.y < image_bounds.height then 
+				local pixelValue = current_image:getPixel(x - image_bounds.x, y - image_bounds.y)
+				local c = get_pxc_as_color(pixelValue)
+				image:drawPixel(x - rect.x, y - rect.y, pixelValue)
+			end
 		end 
 	end
 			
@@ -606,6 +624,11 @@ dlg:button{ id="brush_start",
             selected=boolean,
             focus=boolean,
             onclick=function()
+			
+				if app.activeImage == nil or app.activeSprite.selection == nil then
+	
+					return 
+				end
 	
 				detect_new_brush_and_update()
 			
