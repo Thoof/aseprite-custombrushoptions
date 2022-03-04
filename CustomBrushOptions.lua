@@ -13,7 +13,14 @@ it won't work.
 By Thoof (@Thoof4 on twitter)
 -------------------------------------------------------------------------------]]--
 
+local brush_cap = 32
+
 local sprite = app.activeSprite
+
+if sprite == nil then 
+	app.alert("No sprite found, closing")
+	return
+end
 
 local base_images = {} -- The base image of whatever brushes we're currently using 
 
@@ -659,12 +666,21 @@ dlg:button{ id="brush_start",
 							local rect = Rectangle(selection.bounds.x + x, selection.bounds.y + y, (end_x - x + 1), (end_y - y + 1))
 							subselection_count = subselection_count + 1
 							subselections[subselection_count] = rect
-
-
+							
+			
 						end 
+						
+						if subselection_count >= brush_cap then 
+							break
+						end
 						
 						::continue::
 					end
+					
+					if subselection_count >= brush_cap then 
+							break
+						end
+					
 				end
 				
 				local image_count = 0
