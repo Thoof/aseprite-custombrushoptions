@@ -17,11 +17,6 @@ local brush_cap = 32
 
 local sprite = app.activeSprite
 
-if sprite == nil then 
-	app.alert("No sprite found, closing")
-	return
-end
-
 local base_images = {} -- The base image of whatever brushes we're currently using 
 
 local current_image_index = 0 -- The current brush image we're using
@@ -37,6 +32,8 @@ local last_image_scale_y = 100
 
 local rotation = 0 -- The rotation (Only goes in increments/decrements of 90 degrees)
 
+local curr_offset = Point(0, 0)
+
 -- If we've got a custom brush currently then store it
 if app.activeBrush.type == BrushType.IMAGE then
 	base_images[0] = app.activeBrush.image
@@ -48,7 +45,9 @@ local function reset_brush_and_stop_events()
 	reset_brush()
 	app.events:off(on_fgcolorchange)
 	app.events:off(on_bgcolorchange)
-	sprite.events:off(on_sprite_change)
+	if sprite ~= nil then
+		sprite.events:off(on_sprite_change)
+	end
 	
 end
 
@@ -322,14 +321,47 @@ function reset_brush()
 	resized_last_update = false
 	fgcolor_changed = false
 	bgcolor_changed = false
+	
 end
 
 
 
 
+local function randomize_size()
+	local min_size = dlg.data.randsizemin
+	local max_size = dlg.data.randsizemax
+	
+	local size = math.random(min_size, max_size)
+	
+	dlg:modify {id = "size_x",
+			value = size }
+	
+	if dlg.data.check == true then 
+		dlg:modify {id = "size_y",
+			value = size }
+	else 
+		local size_y = math.random(min_size, max_size)
+		dlg:modify {id = "size_y",
+			value = size_y }
+	end 
+end 
+
+local function get_random_offset()
+	local max_offset = dlg.data.randoffsetlength
+	
+	local offset = math.random(0, max_offset)
+	
+	local rand_angle = math.random() * math.pi * 2
+	local offset_x = math.cos(rand_angle) * offset
+	local offset_y = math.sin(rand_angle) * offset
+	
+	return Point(offset_x, offset_y)
+end 
+
 
 -- Resizes the current brush based on the current slider values --
 local function resize_brush()
+
 
 	local slider_val_x = dlg.data.size_x
 	local slider_val_y = dlg.data.size_y
@@ -359,9 +391,21 @@ local function resize_brush()
 		image_copy = rotate_image(image_copy, rotation)
 	end
 	
+	
 	resized_last_update = true
+	
+	if dlg.data.randoffsetcheck == false then
+		curr_offset = Point(image_copy.width / 2, image_copy.height / 2)
+	
+	end
 
-	app.activeBrush = Brush(image_copy)
+	--app.activeBrush = Brush(image_copy)
+	app.activeBrush = Brush{
+		type = BrushType.IMAGE,
+		center = curr_offset,
+		image = image_copy
+	}
+	
 	last_image_scale_x = slider_val_x
 	last_image_scale_y = slider_val_y
 end
@@ -419,8 +463,8 @@ dlg:slider {
 
 dlg:check {
 	id = "check",
-	label = "Keep aspect",
-	text = string,
+	label = string,
+	text = "Keep aspect",
 	selected = boolean,
 	onclick = function()
 		if app.activeBrush.type ~= BrushType.IMAGE then
@@ -440,8 +484,8 @@ dlg:check {
 
 dlg:check {
 	id = "flipx",
-	label = "Flip X",
-	text = string,
+	label = string,
+	text = "Flip X",
 	selected = boolean,
 	onclick = function()
 		if app.activeBrush.type ~= BrushType.IMAGE then
@@ -457,8 +501,8 @@ dlg:check {
 
 dlg:check {
 	id = "flipy",
-	label = "Flip Y",
-	text = string,
+	label = string,
+	text = "Flip Y",
 	selected = boolean,
 	onclick = function()
 		if app.activeBrush.type ~= BrushType.IMAGE then
@@ -489,8 +533,6 @@ dlg:button {
 		resize_brush()
 	end 
 }
-
-dlg:newrow()
 
 dlg:button {
 	id = "rotate",
@@ -578,6 +620,14 @@ function on_sprite_change()
 		current_image_index = 0
 	end
 	
+	if dlg.data.randsizecheck then 
+		randomize_size()
+	end
+	
+	if dlg.data.randoffsetcheck then 
+		curr_offset = get_random_offset()
+	end 
+	
 	resize_brush()
 	
 end
@@ -616,7 +666,70 @@ local function get_image_from_rect(rect)
 	
 end
 
+dlg:separator{ id=string,
+               label=string,
+               text=string }
+
 dlg:newrow()
+
+-- Random size ui --
+
+dlg:newrow { always = false }	
+
+dlg:check {
+	id = "randsizecheck",
+	label = "Randomize size",
+	text = string,
+	selected = boolean
+
+}
+
+dlg:number{ id="randsizemin",
+            label="Min size %",
+            text="50",
+            decimals=50
+			}
+
+dlg:number{ id="randsizemax",
+            label="Max size %",
+            text="100",
+            decimals=100
+			}
+		
+dlg:separator{ id=string,
+               label=string,
+               text=string }
+
+dlg:newrow()
+
+dlg:check {
+	id = "randoffsetcheck",
+	label = "Randomize offset",
+	text = string,
+	selected = boolean, 
+	onclick = function() 
+	
+		if dlg.data.randoffsetcheck == false then
+			curr_offset = Point(0, 0)
+			resize_brush()
+		end
+		
+	end
+}
+
+dlg:slider {
+    id = "randoffsetlength",
+    label = "Offset amount",
+    min = 0,
+    max = 100,
+    value = 20,
+
+}
+
+
+dlg:separator{ id=string,
+               label=string,
+               text=string }
   
 dlg:button{ id="brush_start",
             label=string,
@@ -629,7 +742,8 @@ dlg:button{ id="brush_start",
 	
 					return 
 				end
-	
+				
+				current_image_index = 0
 				detect_new_brush_and_update()
 				
 				base_images = {}
@@ -743,6 +857,7 @@ dlg:check {
 		resize_brush()
 	end }
 	
+
 dlg:newrow()
 			
 dlg:button {
