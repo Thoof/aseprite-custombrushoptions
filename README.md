@@ -1,8 +1,8 @@
 # aseprite-custombrushoptions
 
-![ezgif com-gif-maker](https://user-images.githubusercontent.com/5313706/156688638-fd383d08-691e-4b4d-ab53-457228a5bc00.gif)
+![ezgif com-gif-maker(1)](https://user-images.githubusercontent.com/5313706/156926743-f9d3f31d-2ddc-4a82-9096-5ad9c4799c88.gif)
 
-A script for aseprite that adds some additional functions to custom brushes
+A script for aseprite that adds some additional functions to custom brushes. Note that in the above gif I'm using an auto clicker macro in addition to the script to mimic the spray can tool (But with randomized brush images). 
 
 **HOW TO USE**
 
