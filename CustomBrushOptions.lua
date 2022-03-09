@@ -34,6 +34,8 @@ local rotation = 0 -- The rotation (Only goes in increments/decrements of 90 deg
 
 local curr_offset = Point(0, 0)
 
+local color_mode = app.activeSprite.colorMode
+
 -- If we've got a custom brush currently then store it
 if app.activeBrush.type == BrushType.IMAGE then
 	base_images[0] = app.activeBrush.image
@@ -48,21 +50,9 @@ local function reset_brush_and_stop_events()
 	if sprite ~= nil then
 		sprite.events:off(on_sprite_change)
 	end
-	
 end
 
 
-app.events:on('sitechange',
-  function()
-	if sprite ~= nil then
-		sprite.events:off(on_sprite_change)
-	end 
-	sprite = app.activeSprite
-	if sprite ~= nil then
-		sprite.events:on('change', on_sprite_change)
-	end
-	
-  end)
 
 -- Initialize the dialog --
 local dlg = Dialog { title = "Custom Brush Options", onclose = reset_brush_and_stop_events }
@@ -72,17 +62,53 @@ local function convert_color_to_app_pixelcolor(color)
 	return app.pixelColor.rgba(color.red, color.green, color.blue, color.alpha)
 end 
 
-local function get_pxc_as_color(pxc)
-	return Color(app.pixelColor.rgbaR(pxc), app.pixelColor.rgbaG(pxc), app.pixelColor.rgbaB(pxc), app.pixelColor.rgbaA(pxc))
-end
 
+
+
+local function get_pixel_alpha(pixel)
+	local alpha = app.pixelColor.rgbaA(pixel)
+	if app.activeSprite.colorMode == ColorMode.INDEXED then
+		if pixel == app.activeSprite.spec.transparentColor then 
+			alpha = 0
+		else 
+			alpha = 255
+		end
+	elseif app.activeSprite.colorMode == ColorMode.GRAY then 
+		alpha = app.pixelColor.grayaA(pixel)
+	end
+	
+	return alpha
+end 
+
+local function get_pixel_alpha_for_colormode(pixel, colormode)
+	local alpha = app.pixelColor.rgbaA(pixel)
+	if colormode == ColorMode.INDEXED then
+		if pixel == app.activeSprite.spec.transparentColor then 
+			alpha = 0
+		else 
+			alpha = 255
+		end
+	elseif colormode == ColorMode.GRAY then 
+		alpha = app.pixelColor.grayaA(pixel)
+	end
+	
+	return alpha
+end 
+
+local function get_pxc_as_color(pxc)
+	return Color(app.pixelColor.rgbaR(pxc), app.pixelColor.rgbaG(pxc), app.pixelColor.rgbaB(pxc), get_pixel_alpha(pxc))
+end
 
 local function get_image_alpha_array(image)
 	local a = {}
 	local count = 0
+	
 	for it in image:pixels() do
 		local pixelValue = it()
-		a[count] = app.pixelColor.rgbaA(pixelValue)
+		
+		local alpha = get_pixel_alpha(pixelValue)
+		
+		a[count] = alpha
 		
 	end 
 	
@@ -99,6 +125,7 @@ local function image_alpha_comparison(image1, image2)
 		return false
 	end
 	
+
 	-- Wasn't sure how to use the api iterator to compare two images so this is not efficient
 	local alpha_array_1 = get_image_alpha_array(image1)
 	local alpha_array_2 = get_image_alpha_array(image2)
@@ -116,7 +143,11 @@ end
 local function does_image_have_transparency(image)
 	for it in image:pixels() do
 		local pixelValue = it()
-		if app.pixelColor.rgbaA(pixelValue) < 255 then
+		
+		local alpha = get_pixel_alpha(pixelValue)
+		
+		
+		if alpha < 255 then
 			return true
 		end 
 	end 
@@ -125,7 +156,7 @@ end
 
 -- Flips image and returns a copy -- 
 local function get_flipped_image(image, flipX, flipY)
-	local image_copy = Image(image.width, image.height)
+	local image_copy = Image(image.width, image.height, image.colorMode)
 	
 	for it in image:pixels() do
 		local pixelValue = it()
@@ -162,7 +193,7 @@ end
 
 -- Rotates the image, based on a rotation that must be some increment of 90 degrees (up to 270) --
 local function rotate_image(image, rotation)
-	local image_new = Image(image.height, image.width)
+	local image_new = Image(image.height, image.width, image.colorMode)
 	
 	for it in image:pixels() do
 		local pixelValue = it()
@@ -177,21 +208,57 @@ local function rotate_image(image, rotation)
 	return image_new
 end
 
+local function get_color_difference(color1, color2)
+	local r = app.pixelColor.rgbaR(color1)
+	local g = app.pixelColor.rgbaG(color1)
+	local b = app.pixelColor.rgbaB(color1)
+	local alpha = get_pixel_alpha(color1)
+	
+	local r2 = app.pixelColor.rgbaR(color2)
+	local g2 = app.pixelColor.rgbaG(color2)
+	local b2 = app.pixelColor.rgbaB(color2)
+	local alpha2 = get_pixel_alpha(color2)
+	
+	local val = math.sqrt((r - r2)^2 + (g - g2)^2 + (b - b2)^2)
+	return val
+end 
+
+local function get_closest_color_in_palette(app_pixel_color)
+	local palette = app.activeSprite.palettes[1]
+
+	local min_value = math.huge
+	local index = 0
+	for i = 0, #palette - 1 do
+		local palette_color = convert_color_to_app_pixelcolor(palette:getColor(i))
+	
+		local diff = get_color_difference(app_pixel_color, palette_color)
+
+		if diff < min_value then
+			min_value = diff
+			index = i
+		end
+	
+	end
+	
+	return index
+end
+
 -- Colors a whole image with the specified color, without changing any alpha values --
 local function color_whole_image_rgb(image, app_pixel_color)
 
-	local color_r = app.pixelColor.rgbaR(app_pixel_color)
-	local color_g = app.pixelColor.rgbaG(app_pixel_color)
-	local color_b = app.pixelColor.rgbaB(app_pixel_color)
-	
 	for it in image:pixels() do
 		local pixelValue = it()
-		local alpha = app.pixelColor.rgbaA(pixelValue)
-		local new_pixel_value = app.pixelColor.rgba(color_r, color_g, color_b, alpha)
-		it(new_pixel_value) -- Set pixel
-
+		
+		local alpha = get_pixel_alpha(pixelValue)
+		
+		if alpha ~= 0 then
+			it(app_pixel_color) -- Set pixel
+		end
+		
 	end
+	
 end 
+
 
 
 --[[  Applies the current foreground color to the image, in the same/a similar way to how brush colors change
@@ -206,6 +273,17 @@ local function apply_selected_colors_to_image(image, apply_foreground, apply_bac
 
 	local current_fgcolor = convert_color_to_app_pixelcolor(app.fgColor)
 	local current_bgcolor = convert_color_to_app_pixelcolor(app.bgColor)
+	
+	local closest_fg = get_closest_color_in_palette(current_fgcolor)
+	local closest_bg = get_closest_color_in_palette(current_bgcolor)
+	
+	if app.activeSprite.colorMode == ColorMode.INDEXED then
+		current_fgcolor = closest_fg
+		current_bgcolor = closest_bg
+	elseif app.activeSprite.colorMode == ColorMode.GRAY then 
+		current_fgcolor = app.pixelColor.graya(current_fgcolor)
+		current_bgcolor = app.pixelColor.graya(current_bgcolor)
+	end
 	
 	local image_has_transparency = does_image_have_transparency(image)
 	
@@ -243,10 +321,106 @@ local function apply_selected_colors_to_image(image, apply_foreground, apply_bac
 	
 end 
 
+local function convert_color_to_colormode(pixelColor)
+	
+	if color_mode == ColorMode.RGB then
+		local a = app.pixelColor.rgbaA(pixelColor)
+		
+		
+		if app.activeSprite.colorMode == ColorMode.INDEXED then 
+			if a == 0 then 
+				return app.activeSprite.spec.transparentColor
+			end
+			
+			return get_closest_color_in_palette(pixelColor)
+		elseif app.activeSprite.colorMode == ColorMode.GRAY then 
+			return app.pixelColor.graya(pixelColor)
+		end
+	
+	elseif color_mode == ColorMode.GRAY then 
+		local value = app.pixelColor.grayaV(pixelColor)
+		local a = app.pixelColor.grayaA(pixelColor)
+		
+		if app.activeSprite.colorMode == ColorMode.RGB then 
+			return app.pixelColor.rgba(value, value, value, a)
+		elseif app.activeSprite.colorMode == ColorMode.INDEXED then 
+			
+			return get_closest_color_in_palette(app.pixelColor.rgba(value, value, value, a))
+		end
+	elseif color_mode == ColorMode.INDEXED then 
+	
+		if pixelColor == app.activeSprite.spec.transparentColor then 
+			return app.pixelColor.rgba(0, 0, 0, 0)
+		end
+		
+		local non_indexed_color = convert_color_to_app_pixelcolor(app.activeSprite.palettes[1]:getColor(pixelColor))
+		
+		local r = app.pixelColor.rgbaR(non_indexed_color)
+		local g = app.pixelColor.rgbaG(non_indexed_color)
+		local b = app.pixelColor.rgbaB(non_indexed_color)
+		local a = app.pixelColor.rgbaA(non_indexed_color)
+
+		if app.activeSprite.colorMode == ColorMode.RGB then
+			return non_indexed_color
+		elseif app.activeSprite.colorMode == ColorMode.GRAY then
+			return app.pixelColor.graya(non_indexed_color)
+		end
+	end
+end
+
+local function convert_image_to_colormode(image) 
+	local new_image = Image(image.width, image.height, app.activeSprite.colorMode)
+	
+	for it in new_image:pixels() do
+		local oldValue = image:getPixel(it.x, it.y)
+		local new_pixelValue = convert_color_to_colormode(oldValue)
+		
+		
+		it(new_pixelValue) -- Set pixel
+
+		
+	end
+	
+	return new_image
+end
+
+local function convert_base_images_to_colormode()
+	for i = 0, #base_images do
+		base_images[i] = convert_image_to_colormode(base_images[i])
+	end
+end
+
+app.events:on('sitechange',
+  function()
+	if sprite ~= nil then
+		sprite.events:off(on_sprite_change)
+	end 
+	sprite = app.activeSprite
+	
+	if sprite ~= nil then
+		
+		sprite.events:on('change', on_sprite_change)
+		
+		if color_mode ~= app.activeSprite.colorMode then
+			convert_base_images_to_colormode()
+			recolored_base_images = {}
+			color_mode = app.activeSprite.colorMode
+		end
+	end
+	
+  end)
+
+
 -- Detects if a new brush is found --
 -- Called any time the user interacts with the widgets or changes fgcolor or bgcolor --
 local function detect_new_brush_and_update()
 	-- Scale up the base image to the previous scale, and compare alphas. If they are the same, it's the same brush
+	
+	if color_mode ~= app.activeSprite.colorMode then
+		convert_base_images_to_colormode()
+		recolored_base_images = {}
+		color_mode = app.activeSprite.colorMode
+	end
 	
 
 	local former_slider_val_percent_x = 0
@@ -259,6 +433,7 @@ local function detect_new_brush_and_update()
 		former_slider_val_percent_x = last_image_scale_x / 100
 		former_slider_val_percent_y = last_image_scale_y / 100
 		base_copy = base_images[current_image_index]:clone()
+		
 		width = math.floor(base_copy.width * former_slider_val_percent_x)
 		height = math.floor(base_copy.height * former_slider_val_percent_y)
 		
@@ -269,7 +444,6 @@ local function detect_new_brush_and_update()
 		end
 		
 	end
-	
 	
 	if (image_alpha_comparison(app.activeBrush.image, base_copy) == false or base_images[current_image_index] == nil) then
 		-- Update the brush parameters, as we've switched brushes entirely since the last update -- 
@@ -559,6 +733,10 @@ dlg:button {
 -- When the fgcolor/bgcolor change, we want to store a version of the brush image at the original image scale
 
 function on_fgcolorchange()
+	if app.activeSprite.colorMode == ColorMode.INDEXED then
+		app.fgColor = get_closest_color_in_palette(convert_color_to_app_pixelcolor(app.fgColor))
+	end 
+
 	-- If the brush isn't an image brush we want nothing to do with it
 	if app.activeBrush.type ~= BrushType.IMAGE then
 		return
@@ -575,6 +753,10 @@ function on_fgcolorchange()
 end
 
 function on_bgcolorchange()
+
+	if app.activeSprite.colorMode == ColorMode.INDEXED then
+		app.bgColor = get_closest_color_in_palette(convert_color_to_app_pixelcolor(app.bgColor))
+	end 
 	-- If the brush isn't an image brush we want nothing to do with it
 	if app.activeBrush.type ~= BrushType.IMAGE then
 		return
@@ -643,7 +825,7 @@ local function point_in_rectangle(x, y, rectangle)
 end
 
 local function get_image_from_rect(rect)
-	local image = Image(rect.width, rect.height)
+	local image = Image(rect.width, rect.height, app.activeSprite.colorMode)
 
 	local current_image = app.activeImage
 	local image_bounds = current_image.cel.bounds
